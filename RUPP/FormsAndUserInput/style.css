@@ -1,0 +1,37 @@
+body {
+  text-align: center;
+}
+
+.text {
+  border-color: turquoise;
+  border-radius: 5px;
+  background-color: azure;
+  width: auto;
+  height: 23px;
+}
+
+label {
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: bold;
+  color: darkblue;
+  padding: 5px;
+}
+
+.btn {
+  padding: 5px;
+  width: 6%;
+  border: none;
+  border-radius: 5px;
+  background-color: rgb(59, 101, 227);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 15px;
+  font-weight: bold;
+  color: aliceblue;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background-color: rgb(70, 70, 177);
+  box-shadow: 3px 4px 4px #aaaaaa;
+  transition: 0.3s;
+}
