@@ -6,7 +6,7 @@
     $limit = 10;
     $offset = ($page - 1) * $limit;
 
-    $sql = "SELECT * FROM products LIMIT $limit OFFSET $offset";
+    $sql = "SELECT * FROM products WHERE isActive = 1 LIMIT $limit OFFSET $offset";
     $result = $conn->query($sql);
 ?>
 
@@ -80,14 +80,19 @@
         }
 
         .edit-link {
-            background-color: #2ecc71;
+            background-color:rgb(32, 164, 87);
             color: white;
         }
 
         .delete-link {
-            background-color: #e74c3c;
+            background-color: rgb(227, 12, 12);
             color: white;
         }
+
+        .delete-link:hover{
+            background-color:rgb(194, 7, 7);
+        }
+
 
         .pagination {
             display: flex;
@@ -134,8 +139,12 @@
                     <td class="action-links">
                         <a href="edit.php?id=<?= $row['id']; ?>" class="edit-link">Edit</a>
                         <a href="delete.php?id=<?= $row['id']; ?>"
-                        class="delete-link"
-                        onclick="return confirm('Are you sure you want to delete this product?');">Delete</a>
+                            class="pushable delete-link"
+                            onclick="return confirm('Are you sure you want to delete this product?');">
+                            <span class="shadow"></span>
+                            <span class="edge"></span>
+                            <span class="front">Delete</span>
+                        </a>
                     </td>
                 </tr>
                 <?php endwhile; ?>
