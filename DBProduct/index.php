@@ -44,6 +44,12 @@
 
         .add-product:hover {
             background-color: #2980b9;
+            scale: 1.05;
+            transition: 0.5s;
+
+        }
+        .add-product:hover:active{
+            opacity: 0.7;
         }
 
         table {
