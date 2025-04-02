@@ -109,7 +109,7 @@
                     id="address"
                     name="address" 
                     class="form-input" 
-                    placeholder="Street, Barangay, City, Province"
+                    placeholder="Street, ​District, commune, City or Province"
                     rows="3"
                 ><?= isset($address) ? htmlspecialchars($address) : '' ?></textarea>
             </div>

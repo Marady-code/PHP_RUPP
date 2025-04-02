@@ -128,7 +128,7 @@
                     id="address"
                     name="address" 
                     class="form-input" 
-                    placeholder="Street, Barangay, City, Province"
+                    placeholder="Street, ​District, commune, City or Province"
                     rows="3"
                 ><?= htmlspecialchars($patient['address']) ?></textarea>
             </div>
