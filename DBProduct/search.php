@@ -1,5 +1,14 @@
 <?php
-    include('connectionDB.php');
+    $dsn = 'mysql:host=localhost;dbname=dbsearchproduct;charset=utf8';
+    $dbUser = 'root';
+    $dbPass = 'Rupp155';
+
+    try{
+        $pdo = new PDO($dsn, $dbUser, $dbPass);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    }catch(PDOException $e){
+        die("Database connection failed : ". $e->getMessage());
+    }
 
     $search = isset($_GET['search']) ?
         trim($_GET['search']) : '';
@@ -9,8 +18,7 @@
         $_GET['sort']: 'pname';
     $order = isset($_GET['order']) ?
         strtoupper($_GET['order']) : 'ASC';
-    
-    // Allowed sort
+// Allowed sort
     $allowedSorts = ['pname', 'price', 'created_at'];
     $allowedOrders = ['ASC', 'DESC'];
     if(!in_array($sort, $allowedSorts)) {
@@ -20,22 +28,23 @@
         $order = 'ASC';
     }
 
-    // Build query
     $sql = "SELECT * FROM products WHERE 1";
-    
+    $params = [];
     if(!empty($search)){
-        $search = $conn->real_escape_string($search);
-        $sql .= " AND (pname LIKE '%$search%' OR description LIKE '%$search%')";
+        $sql .= " AND (pname LIKE :search OR description LIKE :search)";
+        $params[':search'] = '%' . $search .'%';
     }
 
     if(!empty($category)){
-        $category = $conn->real_escape_string($category);
-        $sql .= " AND category = '$category'";
+        $sql .= " AND category = :category";
+        $params[':category'] = $category;
     }
 
     $sql .= " ORDER BY $sort $order";
-    $result = $conn->query($sql);
-    
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
     function sortLink($column, $label, $currentSort, $currentOrder){
         $newOrder = 'ASC';
         if($column === $currentSort){
@@ -57,81 +66,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Products Search, Filter & Sort</title>
-    <link rel="stylesheet" href="style.css">
-    <style>
-        body {
-            display: block;
-            padding: 20px;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        
-        th {
-            background-color: #f2f2f2;
-        }
-        
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        
-        tr:hover {
-            background-color: #f5f5f5;
-        }
-        
-        form {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-        
-        label {
-            font-weight: 500;
-            display: inline-block;
-            margin-bottom: 5px;
-        }
-        
-        input[type="text"], select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            margin-bottom: 15px;
-        }
-        
-        input[type="submit"] {
-            background-color: #3498db;
-            color: white;
-            padding: 10px 15px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        
-        input[type="submit"]:hover {
-            background-color: #2980b9;
-        }
-        
-        a {
-            color: #3498db;
-            text-decoration: none;
-        }
-        
-        a:hover {
-            text-decoration: underline;
-        }
-    </style>
 </head>
 <body>
     <h1>Search Products</h1>
@@ -150,12 +84,9 @@
 
         <input type="submit" value="Search">
     </form>
-    
-    <a href="index.php" class="back-link">Back to Product List</a>
-    
     <hr>
 
-    <?php if ($result && $result->num_rows > 0): ?>
+    <?php if ($products): ?>
         <table>
             <thead>
                 <tr>
@@ -166,20 +97,20 @@
                     <th><?= sortLink('created_at', 'Date Added', $sort, $order) ?></th>
                 </tr>
             </thead>
-            <tbody>
-                <?php while($product = $result->fetch_assoc()): ?>
-                    <tr>
-                        <td><?= htmlspecialchars($product['pname']) ?></td>
-                        <td><?= htmlspecialchars($product['price']) ?></td>
-                        <td><?= htmlspecialchars($product['category']) ?></td>
-                        <td><?= htmlspecialchars($product['description']) ?></td>
-                        <td><?= htmlspecialchars($product['created_at']) ?></td>
-                    </tr>
-                <?php endwhile; ?>
-            </tbody>
+        <tbody>
+            <?php foreach($products as $product): ?>
+                <tr>
+                    <td><?= htmlspecialchars($product['pname']) ?></td>
+                    <td><?= htmlspecialchars($product['price']) ?></td>
+                    <td><?= htmlspecialchars($product['category']) ?></td>
+                    <td><?= htmlspecialchars($product['description']) ?></td>
+                    <td><?= htmlspecialchars($product['created_at']) ?></td>
+                </tr>
+            <?php endforeach; ?>
+        </tbody>
         </table>
-    <?php else: ?>
-        <p>No Products found!</p>
-    <?php endif; ?>
+        <?php else : ?>
+            <p>No Products found!</p>
+        <?php endif; ?>
 </body>
 </html>
