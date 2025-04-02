@@ -164,8 +164,8 @@ body {
 }
 
 .btn-clear {
-  background-color: var(--light-color);
-  color: var(--text-color);
+  background-color: var(--text-light);
+  color: var(--bg-color);
   margin-left: 10px;
   height: 48px;
   padding: 0 20px;
