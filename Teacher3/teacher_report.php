@@ -1,5 +1,4 @@
 <?php
-// teacher_report.php
 require_once 'functions.php';
 
 $teacher_id = $_GET['teacher_id'] ?? null;
@@ -11,11 +10,13 @@ if ($teacher_id) {
     $schedule = getTeacherSchedule($teacher_id, $month, $year);
     $summary = getTeacherMonthlySummary($teacher_id, $month, $year);
     
-    echo "<h4>Report for {$teacher['name']} - " . date('F Y', mktime(0, 0, 0, $month, 1, $year)) . "</h4>";
+    echo "<div class='card'>";
+    echo "<h3><i class='fas fa-user-tie'></i> Report for {$teacher['name']} - " . date('F Y', mktime(0, 0, 0, $month, 1, $year)) . "</h3>";
     
     if (empty($schedule)) {
-        echo "<p>No schedule entries found for this month.</p>";
+        echo "<div class='alert alert-info'><i class='fas fa-info-circle'></i> No schedule entries found for this month.</div>";
     } else {
+        echo "<div style='overflow-x: auto;'>";
         echo "<table>
                 <thead>
                     <tr>
@@ -32,19 +33,34 @@ if ($teacher_id) {
         foreach ($schedule as $entry) {
             echo "<tr>
                     <td>{$entry['week_number']}</td>
-                    <td>{$entry['day_date']}</td>
+                    <td>" . date('M j, Y', strtotime($entry['day_date'])) . "</td>
                     <td>" . date('l', strtotime($entry['day_date'])) . "</td>
                     <td>{$entry['hours']}h</td>
-                    <td>" . ($entry['is_leave'] ? 'On Leave' : 'Working') . "</td>
+                    <td>
+                        <span class='status-badge " . ($entry['is_leave'] ? 'status-leave' : 'status-working') . "'>
+                            " . ($entry['is_leave'] ? 'On Leave' : 'Working') . "
+                        </span>
+                    </td>
                     <td>" . ($entry['substitute_name'] ?? 'None') . "</td>
                 </tr>";
         }
         
-        echo "</tbody></table>";
+        echo "</tbody></table></div>";
         
-        echo "<h4>Summary</h4>";
-        echo "<p>Total Hours: " . number_format($summary['total_hours'], 2) . "h</p>";
-        echo "<p>Total Payment: $" . number_format($summary['total_payment'], 2) . "</p>";
+        echo "<div class='stats-container' style='margin-top: 20px;'>";
+        echo "<div class='stat-card'>
+                <div class='stat-label'>Total Hours</div>
+                <div class='stat-value'>" . number_format($summary['total_hours'], 2) . "</div>
+                <div class='stat-label'>hours</div>
+              </div>";
+        
+        echo "<div class='stat-card'>
+                <div class='stat-label'>Total Payment</div>
+                <div class='stat-value'>$" . number_format($summary['total_payment'], 2) . "</div>
+                <div class='stat-label'>this month</div>
+              </div>";
+        echo "</div>";
     }
+    echo "</div>";
 }
 ?>

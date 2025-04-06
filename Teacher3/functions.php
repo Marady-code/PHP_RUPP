@@ -38,12 +38,20 @@ function getAllTeachers() {
 function addScheduleEntry($teacher_id, $week_number, $day_date, $hours, $is_leave = false, $substitute_id = null) {
     $db = getDB();
     $stmt = $db->prepare("INSERT INTO schedule (teacher_id, week_number, day_date, hours, is_leave, substitute_id) VALUES (?, ?, ?, ?, ?, ?)");
+    
+    // Convert empty substitute_id to NULL
+    $substitute_id = ($substitute_id === '' || $substitute_id === null) ? null : $substitute_id;
+    
     return $stmt->execute([$teacher_id, $week_number, $day_date, $hours, $is_leave, $substitute_id]);
 }
 
 function updateScheduleEntry($id, $teacher_id, $week_number, $day_date, $hours, $is_leave = false, $substitute_id = null) {
     $db = getDB();
     $stmt = $db->prepare("UPDATE schedule SET teacher_id=?, week_number=?, day_date=?, hours=?, is_leave=?, substitute_id=? WHERE id=?");
+    
+    // Convert empty substitute_id to NULL
+    $substitute_id = ($substitute_id === '' || $substitute_id === null) ? null : $substitute_id;
+    
     return $stmt->execute([$teacher_id, $week_number, $day_date, $hours, $is_leave, $substitute_id, $id]);
 }
 
@@ -124,4 +132,16 @@ function getAllTeachersMonthlySummary($month, $year) {
     $stmt->execute([$month, $year]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
+
+function getScheduleEntry($id) {
+    $db = getDB();
+    $stmt = $db->prepare("SELECT s.*, t.name as teacher_name, st.name as substitute_name 
+                         FROM schedule s 
+                         LEFT JOIN teachers t ON s.teacher_id = t.id 
+                         LEFT JOIN teachers st ON s.substitute_id = st.id 
+                         WHERE s.id=?");
+    $stmt->execute([$id]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
 ?>

@@ -19,5 +19,5 @@ function getDB() {
     return $db;
 }
 
-echo "connected successfully!"
+//echo "connected successfully!"
 ?>
