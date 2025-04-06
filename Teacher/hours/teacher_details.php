@@ -1,51 +1,56 @@
 <?php
-require_once '../../config/db_connect.php';
+require_once('../config/db_connect.php');
 
-if(!isset($_GET['teacher_id'])) {
+if(!isset($_GET['teacher_id']) || !isset($_GET['month']) || !isset($_GET['year'])) {
     header("Location: report.php");
     exit();
 }
 
 $teacher_id = $_GET['teacher_id'];
-$month = isset($_GET['month']) ? intval($_GET['month']) : date('n');
-$year = isset($_GET['year']) ? intval($_GET['year']) : date('Y');
+$month = intval($_GET['month']);
+$year = intval($_GET['year']);
 
-// Get teacher info
-$teacherStmt = $conn->prepare("SELECT * FROM teachers WHERE teacher_id = ?");
-$teacherStmt->execute([$teacher_id]);
-$teacher = $teacherStmt->fetch(PDO::FETCH_ASSOC);
+try {
+    // Get teacher info
+    $teacherStmt = $conn->prepare("SELECT * FROM teachers WHERE teacher_id = ?");
+    $teacherStmt->execute([$teacher_id]);
+    $teacher = $teacherStmt->fetch();
+    
+    if(!$teacher) {
+        $_SESSION['error'] = "Teacher not found";
+        header("Location: report.php");
+        exit();
+    }
 
-if(!$teacher) {
-    $_SESSION['error'] = "Teacher not found";
+    // Get teaching hours
+    $hoursStmt = $conn->prepare("
+        SELECT date_taught, hours_taught, notes 
+        FROM teaching_hours 
+        WHERE teacher_id = ? 
+        AND MONTH(date_taught) = ? 
+        AND YEAR(date_taught) = ?
+        ORDER BY date_taught DESC
+    ");
+    $hoursStmt->execute([$teacher_id, $month, $year]);
+    $teachingHours = $hoursStmt->fetchAll();
+
+    // Calculate totals
+    $totalHoursStmt = $conn->prepare("
+        SELECT SUM(hours_taught) AS total_hours 
+        FROM teaching_hours 
+        WHERE teacher_id = ? 
+        AND MONTH(date_taught) = ? 
+        AND YEAR(date_taught) = ?
+    ");
+    $totalHoursStmt->execute([$teacher_id, $month, $year]);
+    $totalHours = $totalHoursStmt->fetch()['total_hours'] ?? 0;
+    $totalEarnings = $totalHours * $teacher['hourly_rate'];
+
+} catch(PDOException $e) {
+    $_SESSION['error'] = "Database error: " . $e->getMessage();
     header("Location: report.php");
     exit();
 }
-
-// Get teaching hours for the selected month/year
-$hoursStmt = $conn->prepare("
-    SELECT date_taught, hours_taught, notes 
-    FROM teaching_hours 
-    WHERE teacher_id = ? 
-    AND MONTH(date_taught) = ? 
-    AND YEAR(date_taught) = ?
-    ORDER BY date_taught DESC
-");
-$hoursStmt->execute([$teacher_id, $month, $year]);
-$teachingHours = $hoursStmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Calculate total hours for the month
-$totalHoursStmt = $conn->prepare("
-    SELECT SUM(hours_taught) AS total_hours 
-    FROM teaching_hours 
-    WHERE teacher_id = ? 
-    AND MONTH(date_taught) = ? 
-    AND YEAR(date_taught) = ?
-");
-$totalHoursStmt->execute([$teacher_id, $month, $year]);
-$totalHours = $totalHoursStmt->fetch(PDO::FETCH_ASSOC)['total_hours'] ?? 0;
-
-// Calculate total earnings for the month
-$totalEarnings = $totalHours * $teacher['hourly_rate'];
 ?>
 
 <!DOCTYPE html>
@@ -64,6 +69,7 @@ $totalEarnings = $totalHours * $teacher['hourly_rate'];
         
         <div class="card mb-4">
             <div class="card-body">
+                <?php flashMessage(); ?>
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h3><?= htmlspecialchars($teacher['full_name']) ?></h3>
@@ -102,7 +108,7 @@ $totalEarnings = $totalHours * $teacher['hourly_rate'];
                 <h5 class="mb-0">Teaching Sessions</h5>
             </div>
             <div class="card-body">
-                <?php if(count($teachingHours) > 0): ?>
+                <?php if(!empty($teachingHours)): ?>
                     <div class="table-responsive">
                         <table class="table table-striped">
                             <thead>

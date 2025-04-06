@@ -9,13 +9,13 @@ $password = 'Rupp155';
 try {
     $conn = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 } catch(PDOException $e) {
     die("Connection failed: " . $e->getMessage());
 }
 
 //echo "connected successfully!";
 
-// Function to display flash messages
 function flashMessage() {
     if(isset($_SESSION['message'])) {
         echo '<div class="alert alert-success alert-dismissible fade show" role="alert">';

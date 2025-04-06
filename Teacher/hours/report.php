@@ -1,31 +1,33 @@
 <?php
-require_once '../../config/db_connect.php';
+require_once('../config/db_connect.php');
 
-// Get month and year from query parameters (default to current month)
 $month = isset($_GET['month']) ? intval($_GET['month']) : date('n');
 $year = isset($_GET['year']) ? intval($_GET['year']) : date('Y');
 
-// Get all teachers with their total hours and earnings for the month
-$sql = "SELECT t.teacher_id, t.full_name, t.hourly_rate, 
-               SUM(th.hours_taught) AS total_hours,
-               SUM(th.hours_taught * t.hourly_rate) AS total_earnings
-        FROM teachers t
-        LEFT JOIN teaching_hours th ON t.teacher_id = th.teacher_id 
-            AND MONTH(th.date_taught) = :month 
-            AND YEAR(th.date_taught) = :year
-        WHERE t.isActive = 1
-        GROUP BY t.teacher_id
-        ORDER BY t.full_name";
+try {
+    $sql = "SELECT t.teacher_id, t.full_name, t.hourly_rate, 
+                   SUM(th.hours_taught) AS total_hours,
+                   SUM(th.hours_taught * t.hourly_rate) AS total_earnings
+            FROM teachers t
+            LEFT JOIN teaching_hours th ON t.teacher_id = th.teacher_id 
+                AND MONTH(th.date_taught) = :month 
+                AND YEAR(th.date_taught) = :year
+            WHERE t.isActive = 1
+            GROUP BY t.teacher_id
+            ORDER BY t.full_name";
 
-$stmt = $conn->prepare($sql);
-$stmt->bindParam(':month', $month, PDO::PARAM_INT);
-$stmt->bindParam(':year', $year, PDO::PARAM_INT);
-$stmt->execute();
-$report = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':month', $month, PDO::PARAM_INT);
+    $stmt->bindParam(':year', $year, PDO::PARAM_INT);
+    $stmt->execute();
+    $report = $stmt->fetchAll();
 
-// Calculate totals
-$total_hours = array_sum(array_column($report, 'total_hours'));
-$total_earnings = array_sum(array_column($report, 'total_earnings'));
+    $total_hours = array_sum(array_column($report, 'total_hours'));
+    $total_earnings = array_sum(array_column($report, 'total_earnings'));
+
+} catch(PDOException $e) {
+    $_SESSION['error'] = "Database error: " . $e->getMessage();
+}
 ?>
 
 <!DOCTYPE html>
@@ -44,6 +46,7 @@ $total_earnings = array_sum(array_column($report, 'total_earnings'));
         
         <div class="card mb-4">
             <div class="card-body">
+                <?php flashMessage(); ?>
                 <form method="get" class="row g-3">
                     <div class="col-md-4">
                         <label for="month" class="form-label">Month</label>

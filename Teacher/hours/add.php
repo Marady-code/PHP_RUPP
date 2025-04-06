@@ -1,9 +1,12 @@
 <?php
-require_once '../../config/db_connect.php';
+require_once('../config/db_connect.php');
 
-// Get all active teachers
-$teachersStmt = $conn->query("SELECT teacher_id, full_name FROM teachers WHERE isActive = 1 ORDER BY full_name");
-$teachers = $teachersStmt->fetchAll(PDO::FETCH_ASSOC);
+try {
+    $teachersStmt = $conn->query("SELECT teacher_id, full_name FROM teachers WHERE isActive = 1 ORDER BY full_name");
+    $teachers = $teachersStmt->fetchAll();
+} catch(PDOException $e) {
+    $_SESSION['error'] = "Database error: " . $e->getMessage();
+}
 
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $teacher_id = $_POST['teacher_id'];
@@ -11,29 +14,18 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $hours_taught = $_POST['hours_taught'];
     $notes = $_POST['notes'];
 
-    // Validate input
-    $errors = [];
-    if(empty($teacher_id)) $errors[] = "Teacher is required";
-    if(empty($date_taught)) $errors[] = "Date is required";
-    if(empty($hours_taught) || $hours_taught <= 0) $errors[] = "Valid hours required";
-
-    if(empty($errors)) {
-        try {
-            $stmt = $conn->prepare("INSERT INTO teaching_hours (teacher_id, date_taught, hours_taught, notes) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$teacher_id, $date_taught, $hours_taught, $notes]);
-            
-            $_SESSION['message'] = "Teaching hours added successfully!";
-            header("Location: index.php");
-            exit();
-        } catch(PDOException $e) {
-            $_SESSION['error'] = "Error: " . $e->getMessage();
-        }
-    } else {
-        $_SESSION['error'] = implode("<br>", $errors);
+    try {
+        $stmt = $conn->prepare("INSERT INTO teaching_hours (teacher_id, date_taught, hours_taught, notes) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$teacher_id, $date_taught, $hours_taught, $notes]);
+        
+        $_SESSION['message'] = "Teaching hours added successfully!";
+        header("Location: index.php");
+        exit();
+    } catch(PDOException $e) {
+        $_SESSION['error'] = "Error: " . $e->getMessage();
     }
 }
 
-// Pre-select teacher if coming from teacher view
 $selectedTeacher = isset($_GET['teacher_id']) ? intval($_GET['teacher_id']) : null;
 ?>
 
@@ -56,7 +48,7 @@ $selectedTeacher = isset($_GET['teacher_id']) ? intval($_GET['teacher_id']) : nu
                 <?php flashMessage(); ?>
                 <form method="post">
                     <div class="mb-3">
-                        <label for="teacher_id" class="form-label">Teacher <span class="text-danger">*</span></label>
+                        <label for="teacher_id" class="form-label">Teacher</label>
                         <select class="form-select" id="teacher_id" name="teacher_id" required>
                             <option value="">Select Teacher</option>
                             <?php foreach($teachers as $teacher): ?>
@@ -70,13 +62,13 @@ $selectedTeacher = isset($_GET['teacher_id']) ? intval($_GET['teacher_id']) : nu
                     </div>
                     
                     <div class="mb-3">
-                        <label for="date_taught" class="form-label">Date <span class="text-danger">*</span></label>
+                        <label for="date_taught" class="form-label">Date</label>
                         <input type="date" class="form-control" id="date_taught" name="date_taught" required
                                value="<?= isset($_POST['date_taught']) ? htmlspecialchars($_POST['date_taught']) : date('Y-m-d') ?>">
                     </div>
                     
                     <div class="mb-3">
-                        <label for="hours_taught" class="form-label">Hours Taught <span class="text-danger">*</span></label>
+                        <label for="hours_taught" class="form-label">Hours Taught</label>
                         <input type="number" step="0.01" class="form-control" id="hours_taught" name="hours_taught" required
                                value="<?= isset($_POST['hours_taught']) ? htmlspecialchars($_POST['hours_taught']) : '' ?>">
                     </div>

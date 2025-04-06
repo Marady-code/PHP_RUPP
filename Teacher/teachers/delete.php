@@ -1,5 +1,5 @@
 <?php
-require_once '../../config/db_connect.php';
+require_once('../config/db_connect.php');
 
 if(!isset($_GET['id'])) {
     header("Location: index.php");
@@ -9,7 +9,6 @@ if(!isset($_GET['id'])) {
 $teacher_id = $_GET['id'];
 
 try {
-    // Soft delete (set isActive to 0)
     $stmt = $conn->prepare("UPDATE teachers SET isActive = 0 WHERE teacher_id = ?");
     $stmt->execute([$teacher_id]);
     

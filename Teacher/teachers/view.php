@@ -1,5 +1,5 @@
 <?php
-require_once '../../config/db_connect.php';
+require_once('../config/db_connect.php');
 
 if(!isset($_GET['id'])) {
     header("Location: index.php");
@@ -8,40 +8,33 @@ if(!isset($_GET['id'])) {
 
 $teacher_id = $_GET['id'];
 
-// Fetch teacher data
-$stmt = $conn->prepare("SELECT * FROM teachers WHERE teacher_id = ?");
-$stmt->execute([$teacher_id]);
-$teacher = $stmt->fetch(PDO::FETCH_ASSOC);
+try {
+    $stmt = $conn->prepare("SELECT * FROM teachers WHERE teacher_id = ?");
+    $stmt->execute([$teacher_id]);
+    $teacher = $stmt->fetch();
+    
+    if(!$teacher) {
+        $_SESSION['error'] = "Teacher not found";
+        header("Location: index.php");
+        exit();
+    }
 
-if(!$teacher) {
-    $_SESSION['error'] = "Teacher not found";
+    // Get teaching hours
+    $hoursStmt = $conn->prepare("
+        SELECT date_taught, hours_taught, notes 
+        FROM teaching_hours 
+        WHERE teacher_id = ? 
+        ORDER BY date_taught DESC 
+        LIMIT 5
+    ");
+    $hoursStmt->execute([$teacher_id]);
+    $teachingHours = $hoursStmt->fetchAll();
+
+} catch(PDOException $e) {
+    $_SESSION['error'] = "Database error: " . $e->getMessage();
     header("Location: index.php");
     exit();
 }
-
-// Fetch teaching hours for this teacher (last 30 days)
-$hoursStmt = $conn->prepare("
-    SELECT date_taught, hours_taught, notes 
-    FROM teaching_hours 
-    WHERE teacher_id = ? 
-    AND date_taught >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-    ORDER BY date_taught DESC
-");
-$hoursStmt->execute([$teacher_id]);
-$teachingHours = $hoursStmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Calculate total hours for last 30 days
-$totalHoursStmt = $conn->prepare("
-    SELECT SUM(hours_taught) AS total_hours 
-    FROM teaching_hours 
-    WHERE teacher_id = ? 
-    AND date_taught >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-");
-$totalHoursStmt->execute([$teacher_id]);
-$totalHours = $totalHoursStmt->fetch(PDO::FETCH_ASSOC)['total_hours'] ?? 0;
-
-// Calculate total earnings for last 30 days
-$totalEarnings = $totalHours * $teacher['hourly_rate'];
 ?>
 
 <!DOCTYPE html>
@@ -75,75 +68,42 @@ $totalEarnings = $totalHours * $teacher['hourly_rate'];
             </div>
         </div>
 
-        <div class="row">
-            <div class="col-md-6 mb-4">
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Last 30 Days Summary</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row text-center">
-                            <div class="col-md-6 mb-3">
-                                <div class="card bg-light">
-                                    <div class="card-body">
-                                        <h6 class="card-title">Total Hours</h6>
-                                        <h3 class="card-text"><?= number_format($totalHours, 2) ?></h3>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="card bg-light">
-                                    <div class="card-body">
-                                        <h6 class="card-title">Total Earnings</h6>
-                                        <h3 class="card-text">$<?= number_format($totalEarnings, 2) ?></h3>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <a href="../hours/add.php?teacher_id=<?= $teacher['teacher_id'] ?>" class="btn btn-success w-100">
-                            <i class="fas fa-plus"></i> Add Teaching Hours
-                        </a>
-                    </div>
-                </div>
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-clock"></i> Recent Teaching Hours</h5>
             </div>
-
-            <div class="col-md-6 mb-4">
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0"><i class="fas fa-clock"></i> Recent Teaching Hours</h5>
+            <div class="card-body">
+                <?php if(!empty($teachingHours)): ?>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Hours</th>
+                                    <th>Earnings</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach($teachingHours as $hour): ?>
+                                    <tr>
+                                        <td><?= date('M d, Y', strtotime($hour['date_taught'])) ?></td>
+                                        <td><?= number_format($hour['hours_taught'], 2) ?></td>
+                                        <td>$<?= number_format($hour['hours_taught'] * $teacher['hourly_rate'], 2) ?></td>
+                                        <td><?= htmlspecialchars($hour['notes'] ?: 'N/A') ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="card-body">
-                        <?php if(count($teachingHours) > 0): ?>
-                            <div class="table-responsive">
-                                <table class="table table-sm">
-                                    <thead>
-                                        <tr>
-                                            <th>Date</th>
-                                            <th>Hours</th>
-                                            <th>Notes</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach($teachingHours as $hour): ?>
-                                            <tr>
-                                                <td><?= date('M d, Y', strtotime($hour['date_taught'])) ?></td>
-                                                <td><?= number_format($hour['hours_taught'], 2) ?></td>
-                                                <td><?= htmlspecialchars($hour['notes'] ?: '') ?></td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <a href="../hours/teacher_details.php?teacher_id=<?= $teacher['teacher_id'] ?>" class="btn btn-primary w-100">
-                                <i class="fas fa-list"></i> View All Hours
-                            </a>
-                        <?php else: ?>
-                            <div class="alert alert-info mb-0">
-                                <i class="fas fa-info-circle"></i> No teaching hours recorded in the last 30 days.
-                            </div>
-                        <?php endif; ?>
+                    <a href="../hours/add.php?teacher_id=<?= $teacher['teacher_id'] ?>" class="btn btn-success mt-3">
+                        <i class="fas fa-plus"></i> Add Teaching Hours
+                    </a>
+                <?php else: ?>
+                    <div class="alert alert-info mb-0">
+                        <i class="fas fa-info-circle"></i> No teaching hours recorded yet.
                     </div>
-                </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>

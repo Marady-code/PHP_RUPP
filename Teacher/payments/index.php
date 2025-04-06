@@ -1,16 +1,18 @@
 <?php
-require_once '../../config/db_connect.php';
+require_once('../config/db_connect.php');
 
-// Get recent payments (last 30 days)
-$sql = "SELECT p.*, t.full_name 
-        FROM payments p
-        JOIN teachers t ON p.teacher_id = t.teacher_id
-        WHERE p.payment_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-        ORDER BY p.payment_date DESC
-        LIMIT 50";
+try {
+    $sql = "SELECT p.*, t.full_name 
+            FROM payments p
+            JOIN teachers t ON p.teacher_id = t.teacher_id
+            ORDER BY p.payment_date DESC
+            LIMIT 50";
 
-$stmt = $conn->query($sql);
-$payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmt = $conn->query($sql);
+    $payments = $stmt->fetchAll();
+} catch(PDOException $e) {
+    $_SESSION['error'] = "Database error: " . $e->getMessage();
+}
 ?>
 
 <!DOCTYPE html>
@@ -29,13 +31,14 @@ $payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         <div class="card mb-4">
             <div class="card-body">
+                <?php flashMessage(); ?>
                 <a href="add.php" class="btn btn-success">
                     <i class="fas fa-plus"></i> Add Payment
                 </a>
             </div>
         </div>
 
-        <?php if(count($payments) > 0): ?>
+        <?php if(!empty($payments)): ?>
             <div class="table-responsive">
                 <table class="table table-striped table-hover">
                     <thead class="table-dark">
@@ -60,7 +63,7 @@ $payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         <?php else: ?>
             <div class="alert alert-info">
-                <i class="fas fa-info-circle"></i> No payments recorded in the last 30 days.
+                <i class="fas fa-info-circle"></i> No payments recorded yet.
             </div>
         <?php endif; ?>
     </div>

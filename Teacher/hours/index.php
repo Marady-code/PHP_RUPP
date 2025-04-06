@@ -1,16 +1,18 @@
 <?php
-require_once '../../config/db_connect.php';
+require_once('../config/db_connect.php');
 
-// Get recent teaching hours (last 30 days)
-$sql = "SELECT th.*, t.full_name, t.hourly_rate 
-        FROM teaching_hours th
-        JOIN teachers t ON th.teacher_id = t.teacher_id
-        WHERE th.date_taught >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-        ORDER BY th.date_taught DESC
-        LIMIT 50";
+try {
+    $sql = "SELECT th.*, t.full_name, t.hourly_rate 
+            FROM teaching_hours th
+            JOIN teachers t ON th.teacher_id = t.teacher_id
+            ORDER BY th.date_taught DESC
+            LIMIT 50";
 
-$stmt = $conn->query($sql);
-$hours = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmt = $conn->query($sql);
+    $hours = $stmt->fetchAll();
+} catch(PDOException $e) {
+    $_SESSION['error'] = "Database error: " . $e->getMessage();
+}
 ?>
 
 <!DOCTYPE html>
@@ -29,6 +31,7 @@ $hours = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         <div class="card mb-4">
             <div class="card-body">
+                <?php flashMessage(); ?>
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <a href="report.php" class="btn btn-info me-2">
@@ -42,7 +45,7 @@ $hours = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         </div>
 
-        <?php if(count($hours) > 0): ?>
+        <?php if(!empty($hours)): ?>
             <div class="table-responsive">
                 <table class="table table-striped table-hover">
                     <thead class="table-dark">
@@ -69,7 +72,7 @@ $hours = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         <?php else: ?>
             <div class="alert alert-info">
-                <i class="fas fa-info-circle"></i> No teaching hours recorded in the last 30 days.
+                <i class="fas fa-info-circle"></i> No teaching hours recorded yet.
             </div>
         <?php endif; ?>
     </div>

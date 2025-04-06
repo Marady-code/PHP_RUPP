@@ -1,10 +1,11 @@
 body {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   background-color: #f8f9fa;
+  padding-top: 20px;
 }
 
-.navbar-brand {
-  font-weight: 600;
+.navbar {
+  margin-bottom: 30px;
 }
 
 .card {
@@ -29,64 +30,6 @@ body {
   border-radius: 8px;
 }
 
-.status-badge {
-  padding: 5px 10px;
-  border-radius: 20px;
-  font-size: 0.9rem;
-  font-weight: 500;
-}
-
-.status-badge.admitted {
-  background-color: #d4edda;
-  color: #155724;
-}
-
-.status-badge.discharged {
-  background-color: #f8d7da;
-  color: #721c24;
-}
-
-.blood-type {
-  display: inline-block;
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-weight: bold;
-  color: white;
-}
-
-.blood-type.a\\ + p,
-.blood-type.ap {
-  background-color: #dc3545;
-}
-.blood-type.a\\-p,
-.blood-type.am {
-  background-color: #dc3545;
-}
-.blood-type.b\\ + p,
-.blood-type.bp {
-  background-color: #fd7e14;
-}
-.blood-type.b\\-p,
-.blood-type.bm {
-  background-color: #fd7e14;
-}
-.blood-type.ab\\ + p,
-.blood-type.abp {
-  background-color: #6f42c1;
-}
-.blood-type.ab\\-p,
-.blood-type.abm {
-  background-color: #6f42c1;
-}
-.blood-type.o\\ + p,
-.blood-type.op {
-  background-color: #20c997;
-}
-.blood-type.o\\-p,
-.blood-type.om {
-  background-color: #20c997;
-}
-
 .empty-state {
   text-align: center;
   padding: 40px 20px;
@@ -102,115 +45,15 @@ body {
   margin-bottom: 20px;
 }
 
-.search-input-group {
-  display: flex;
-  align-items: center;
-}
-
-.search-icon {
-  margin-right: -35px;
-  z-index: 10;
-  color: #6c757d;
-  padding-left: 15px;
-}
-
-.btn-search {
-  margin-left: 5px;
-}
-
-.btn-clear {
-  margin-left: 5px;
-}
-
-.pagination-container {
-  margin-top: 20px;
-}
-
-.pagination {
-  justify-content: center;
-}
-
-.page-nav {
-  padding: 0.375rem 0.75rem;
-}
-
-.page-current {
-  padding: 0.375rem 0.75rem;
-  background-color: #0d6efd;
-  color: white;
-  border-radius: 5px;
-}
-
-.page-dots {
-  padding: 0.375rem 0.75rem;
-}
-
 .table-responsive {
   overflow-x: auto;
 }
 
-.patient-table {
-  width: 100%;
-  border-collapse: collapse;
+.form-label.required:after {
+  content: " *";
+  color: #dc3545;
 }
 
-.patient-table th,
-.patient-table td {
-  padding: 12px 15px;
-  text-align: left;
-  border-bottom: 1px solid #dee2e6;
-}
-
-.patient-table th {
+.input-group-text {
   background-color: #f8f9fa;
-  font-weight: 600;
-}
-
-.patient-id {
-  font-weight: 600;
-  color: #0d6efd;
-}
-
-.patient-name small {
-  display: block;
-  color: #6c757d;
-  font-size: 0.875rem;
-}
-
-.actions {
-  white-space: nowrap;
-}
-
-.btn-action {
-  display: inline-block;
-  padding: 5px 8px;
-  margin-right: 5px;
-  border-radius: 4px;
-  color: white;
-}
-
-.btn-edit {
-  background-color: #ffc107;
-}
-
-.btn-delete {
-  background-color: #dc3545;
-}
-
-.btn-view {
-  background-color: #17a2b8;
-}
-
-.btn-action:hover {
-  color: white;
-  opacity: 0.8;
-}
-
-.sort-link {
-  color: inherit;
-  text-decoration: none;
-}
-
-.sort-link:hover {
-  color: #0d6efd;
 }

@@ -1,9 +1,12 @@
 <?php
-require_once '../../config/db_connect.php';
+require_once('../config/db_connect.php');
 
-// Get all active teachers
-$teachersStmt = $conn->query("SELECT teacher_id, full_name FROM teachers WHERE isActive = 1 ORDER BY full_name");
-$teachers = $teachersStmt->fetchAll(PDO::FETCH_ASSOC);
+try {
+    $teachersStmt = $conn->query("SELECT teacher_id, full_name FROM teachers WHERE isActive = 1 ORDER BY full_name");
+    $teachers = $teachersStmt->fetchAll();
+} catch(PDOException $e) {
+    $_SESSION['error'] = "Database error: " . $e->getMessage();
+}
 
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $teacher_id = $_POST['teacher_id'];
@@ -11,25 +14,15 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $payment_date = $_POST['payment_date'];
     $notes = $_POST['notes'];
 
-    // Validate input
-    $errors = [];
-    if(empty($teacher_id)) $errors[] = "Teacher is required";
-    if(empty($amount) || $amount <= 0) $errors[] = "Valid amount required";
-    if(empty($payment_date)) $errors[] = "Payment date is required";
-
-    if(empty($errors)) {
-        try {
-            $stmt = $conn->prepare("INSERT INTO payments (teacher_id, amount, payment_date, notes) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$teacher_id, $amount, $payment_date, $notes]);
-            
-            $_SESSION['message'] = "Payment recorded successfully!";
-            header("Location: index.php");
-            exit();
-        } catch(PDOException $e) {
-            $_SESSION['error'] = "Error: " . $e->getMessage();
-        }
-    } else {
-        $_SESSION['error'] = implode("<br>", $errors);
+    try {
+        $stmt = $conn->prepare("INSERT INTO payments (teacher_id, amount, payment_date, notes) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$teacher_id, $amount, $payment_date, $notes]);
+        
+        $_SESSION['message'] = "Payment recorded successfully!";
+        header("Location: index.php");
+        exit();
+    } catch(PDOException $e) {
+        $_SESSION['error'] = "Error: " . $e->getMessage();
     }
 }
 ?>
@@ -53,7 +46,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <?php flashMessage(); ?>
                 <form method="post">
                     <div class="mb-3">
-                        <label for="teacher_id" class="form-label">Teacher <span class="text-danger">*</span></label>
+                        <label for="teacher_id" class="form-label">Teacher</label>
                         <select class="form-select" id="teacher_id" name="teacher_id" required>
                             <option value="">Select Teacher</option>
                             <?php foreach($teachers as $teacher): ?>
@@ -65,7 +58,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </div>
                     
                     <div class="mb-3">
-                        <label for="amount" class="form-label">Amount <span class="text-danger">*</span></label>
+                        <label for="amount" class="form-label">Amount</label>
                         <div class="input-group">
                             <span class="input-group-text">$</span>
                             <input type="number" step="0.01" class="form-control" id="amount" name="amount" required
@@ -74,7 +67,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </div>
                     
                     <div class="mb-3">
-                        <label for="payment_date" class="form-label">Payment Date <span class="text-danger">*</span></label>
+                        <label for="payment_date" class="form-label">Payment Date</label>
                         <input type="date" class="form-control" id="payment_date" name="payment_date" required
                                value="<?= isset($_POST['payment_date']) ? htmlspecialchars($_POST['payment_date']) : date('Y-m-d') ?>">
                     </div>

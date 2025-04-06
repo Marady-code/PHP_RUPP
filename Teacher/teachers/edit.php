@@ -1,5 +1,5 @@
 <?php
-require_once '../../config/db_connect.php';
+require_once('../config/db_connect.php');
 
 if(!isset($_GET['id'])) {
     header("Location: index.php");
@@ -8,13 +8,19 @@ if(!isset($_GET['id'])) {
 
 $teacher_id = $_GET['id'];
 
-// Fetch teacher data
-$stmt = $conn->prepare("SELECT * FROM teachers WHERE teacher_id = ?");
-$stmt->execute([$teacher_id]);
-$teacher = $stmt->fetch(PDO::FETCH_ASSOC);
+try {
+    // Fetch teacher data
+    $stmt = $conn->prepare("SELECT * FROM teachers WHERE teacher_id = ?");
+    $stmt->execute([$teacher_id]);
+    $teacher = $stmt->fetch();
 
-if(!$teacher) {
-    $_SESSION['error'] = "Teacher not found";
+    if(!$teacher) {
+        $_SESSION['error'] = "Teacher not found";
+        header("Location: index.php");
+        exit();
+    }
+} catch(PDOException $e) {
+    $_SESSION['error'] = "Database error: " . $e->getMessage();
     header("Location: index.php");
     exit();
 }
@@ -25,25 +31,15 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $phone = trim($_POST['phone']);
     $hourly_rate = $_POST['hourly_rate'];
 
-    // Validate input
-    $errors = [];
-    if(empty($full_name)) $errors[] = "Full name is required";
-    if(!empty($email) && !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = "Invalid email format";
-    if(empty($hourly_rate) || $hourly_rate <= 0) $errors[] = "Valid hourly rate is required";
-
-    if(empty($errors)) {
-        try {
-            $stmt = $conn->prepare("UPDATE teachers SET full_name = ?, email = ?, phone = ?, hourly_rate = ? WHERE teacher_id = ?");
-            $stmt->execute([$full_name, $email, $phone, $hourly_rate, $teacher_id]);
-            
-            $_SESSION['message'] = "Teacher updated successfully!";
-            header("Location: index.php");
-            exit();
-        } catch(PDOException $e) {
-            $_SESSION['error'] = "Error: " . $e->getMessage();
-        }
-    } else {
-        $_SESSION['error'] = implode("<br>", $errors);
+    try {
+        $stmt = $conn->prepare("UPDATE teachers SET full_name = ?, email = ?, phone = ?, hourly_rate = ? WHERE teacher_id = ?");
+        $stmt->execute([$full_name, $email, $phone, $hourly_rate, $teacher_id]);
+        
+        $_SESSION['message'] = "Teacher updated successfully!";
+        header("Location: index.php");
+        exit();
+    } catch(PDOException $e) {
+        $_SESSION['error'] = "Error: " . $e->getMessage();
     }
 }
 ?>
@@ -67,7 +63,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <?php flashMessage(); ?>
                 <form method="post">
                     <div class="mb-3">
-                        <label for="full_name" class="form-label">Full Name <span class="text-danger">*</span></label>
+                        <label for="full_name" class="form-label required">Full Name</label>
                         <input type="text" class="form-control" id="full_name" name="full_name" required
                                value="<?= htmlspecialchars($teacher['full_name']) ?>">
                     </div>
@@ -85,7 +81,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </div>
                     
                     <div class="mb-3">
-                        <label for="hourly_rate" class="form-label">Hourly Rate <span class="text-danger">*</span></label>
+                        <label for="hourly_rate" class="form-label required">Hourly Rate</label>
                         <div class="input-group">
                             <span class="input-group-text">$</span>
                             <input type="number" step="0.01" class="form-control" id="hourly_rate" name="hourly_rate" required

@@ -1,9 +1,12 @@
 <?php
-require_once '../../config/db_connect.php';
+require_once('../config/db_connect.php');
 
-// Get all inactive teachers
-$stmt = $conn->query("SELECT * FROM teachers WHERE isActive = 0 ORDER BY full_name");
-$teachers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+try {
+    $stmt = $conn->query("SELECT * FROM teachers WHERE isActive = 0 ORDER BY full_name");
+    $teachers = $stmt->fetchAll();
+} catch(PDOException $e) {
+    $_SESSION['error'] = "Database error: " . $e->getMessage();
+}
 ?>
 
 <!DOCTYPE html>
@@ -27,7 +30,7 @@ $teachers = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         </div>
 
-        <?php if(count($teachers) > 0): ?>
+        <?php if(!empty($teachers)): ?>
             <div class="table-responsive">
                 <table class="table table-striped table-hover">
                     <thead class="table-dark">

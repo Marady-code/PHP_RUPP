@@ -1,22 +1,22 @@
 <?php
-require_once '../../config/db_connect.php';
+require_once '../config/db_connect.php';
 
-// Search functionality
-$search = isset($_GET['search']) ? trim($_GET['search']) : '';
-
-$sql = "SELECT * FROM teachers WHERE isActive = 1";
-if(!empty($search)) {
-    $sql .= " AND (full_name LIKE :search OR email LIKE :search OR phone LIKE :search)";
-}
-$sql .= " ORDER BY full_name ASC";
-
-$stmt = $conn->prepare($sql);
-if(!empty($search)) {
-    $searchParam = "%$search%";
-    $stmt->bindParam(':search', $searchParam);
-}
+// Fetch all active teachers
+$stmt = $conn->prepare("
+    SELECT 
+        t.*,
+        COALESCE(SUM(th.hours_taught), 0) as total_hours,
+        COALESCE(SUM(th.hours_taught * t.hourly_rate), 0) as total_earnings
+    FROM teachers t
+    LEFT JOIN teaching_hours th ON t.id = th.teacher_id 
+        AND MONTH(th.date) = MONTH(CURRENT_DATE)
+        AND YEAR(th.date) = YEAR(CURRENT_DATE)
+    WHERE t.deleted_at IS NULL
+    GROUP BY t.id
+    ORDER BY t.name
+");
 $stmt->execute();
-$teachers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$teachers = $stmt->fetchAll();
 ?>
 
 <!DOCTYPE html>
@@ -24,73 +24,87 @@ $teachers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teacher Management</title>
+    <title>Teachers Management</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="../../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
-    <?php include '../../config/db_connect.php'; ?>
-    <div class="container mt-4">
-        <h1 class="mb-4"><i class="fas fa-chalkboard-teacher"></i> Teacher Management</h1>
-        
-        <div class="card mb-4">
+    <?php include '../includes/navbar.php'; ?>
+
+    <div class="container my-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="fas fa-users me-2"></i>Teachers</h2>
+            <a href="create.php" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Add New Teacher
+            </a>
+        </div>
+
+        <?php flashMessage(); ?>
+
+        <div class="card">
             <div class="card-body">
-                <?php flashMessage(); ?>
-                <div class="d-flex justify-content-between align-items-center">
-                    <form method="get" class="w-50">
-                        <div class="input-group">
-                            <input type="text" name="search" class="form-control" placeholder="Search teachers..." value="<?= htmlspecialchars($search) ?>">
-                            <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i></button>
-                            <?php if(!empty($search)): ?>
-                                <a href="index.php" class="btn btn-outline-secondary">Clear</a>
-                            <?php endif; ?>
-                        </div>
-                    </form>
-                    <a href="create.php" class="btn btn-success"><i class="fas fa-plus"></i> Add Teacher</a>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Phone Number</th>
+                                <th>Start Date</th>
+                                <th>Hourly Rate</th>
+                                <th>This Month Hours</th>
+                                <th>This Month Earnings</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($teachers as $teacher): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($teacher['name']) ?></td>
+                                <td><?= htmlspecialchars($teacher['phone_number']) ?></td>
+                                <td><?= date('Y-m-d', strtotime($teacher['start_date'])) ?></td>
+                                <td>$<?= number_format($teacher['hourly_rate'], 2) ?></td>
+                                <td><?= number_format($teacher['total_hours'], 2) ?> hrs</td>
+                                <td>$<?= number_format($teacher['total_earnings'], 2) ?></td>
+                                <td>
+                                    <span class="badge bg-<?= $teacher['status'] === 'active' ? 'success' : 'danger' ?>">
+                                        <?= ucfirst($teacher['status']) ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="view.php?id=<?= $teacher['id'] ?>" class="btn btn-sm btn-info">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="edit.php?id=<?= $teacher['id'] ?>" class="btn btn-sm btn-warning">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="schedule.php?id=<?= $teacher['id'] ?>" class="btn btn-sm btn-success">
+                                            <i class="fas fa-calendar"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-sm btn-danger" 
+                                                onclick="deleteTeacher(<?= $teacher['id'] ?>)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
-
-        <?php if(count($teachers) > 0): ?>
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>ID</th>
-                            <th>Name</th>
-                            <th>Contact</th>
-                            <th>Hourly Rate</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach($teachers as $teacher): ?>
-                            <tr>
-                                <td><?= htmlspecialchars($teacher['teacher_id']) ?></td>
-                                <td><?= htmlspecialchars($teacher['full_name']) ?></td>
-                                <td>
-                                    <?= htmlspecialchars($teacher['email']) ?><br>
-                                    <?= htmlspecialchars($teacher['phone']) ?>
-                                </td>
-                                <td>$<?= number_format($teacher['hourly_rate'], 2) ?></td>
-                                <td>
-                                    <a href="view.php?id=<?= $teacher['teacher_id'] ?>" class="btn btn-sm btn-info" title="View"><i class="fas fa-eye"></i></a>
-                                    <a href="edit.php?id=<?= $teacher['teacher_id'] ?>" class="btn btn-sm btn-warning" title="Edit"><i class="fas fa-edit"></i></a>
-                                    <a href="delete.php?id=<?= $teacher['teacher_id'] ?>" class="btn btn-sm btn-danger" title="Delete" onclick="return confirm('Are you sure you want to delete this teacher?')"><i class="fas fa-trash"></i></a>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php else: ?>
-            <div class="alert alert-info">
-                <i class="fas fa-info-circle"></i> No teachers found. <a href="create.php" class="alert-link">Add a new teacher</a>.
-            </div>
-        <?php endif; ?>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    function deleteTeacher(id) {
+        if (confirm('Are you sure you want to delete this teacher?')) {
+            window.location.href = `delete.php?id=${id}`;
+        }
+    }
+    </script>
 </body>
 </html>
