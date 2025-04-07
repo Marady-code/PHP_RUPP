@@ -361,6 +361,7 @@ $editing_schedule = isset($_GET['edit_schedule']) ? getScheduleEntry($_GET['edit
                         <?php endforeach; ?>
                     </div>
                 </div>
+            </div>       
                 
  <!-- Table View with Pagination -->
  <div style="overflow-x: auto;">
@@ -424,6 +425,7 @@ $editing_schedule = isset($_GET['edit_schedule']) ? getScheduleEntry($_GET['edit
                 <?php endif; ?>
             </div>
         </div>
+    </div>
         
         <!-- Summary Tab -->
         <div id="summary" class="tab-content <?= $active_tab === 'summary' ? 'active' : '' ?>">
