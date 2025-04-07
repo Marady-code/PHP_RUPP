@@ -52,16 +52,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Get current month and year for display
-$current_month = date('m');
-$current_year = date('Y');
-$teachers = getAllTeachers();
+$current_month = $_GET['month'] ?? date('m');
+$current_year = $_GET['year'] ?? date('Y');
+$active_tab = $_GET['active_tab'] ?? 'teachers';
+
+// Fetch data
 $schedules = getAllSchedules($current_month, $current_year);
 $summary = getAllTeachersMonthlySummary($current_month, $current_year);
+$teachers = getAllTeachers();
 
-// Check if we're editing a teacher
+// Pagination for schedules
+$current_page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$per_page = 10;
+$total_entries = count($schedules);
+$total_pages = ceil($total_entries / $per_page);
+$offset = ($current_page - 1) * $per_page;
+$paginated_schedules = array_slice($schedules, $offset, $per_page);
+
+// Check if we're editing a teacher or schedule
 $editing_teacher = isset($_GET['edit_teacher']) ? getTeacher($_GET['edit_teacher']) : null;
-
-// Check if we're editing a schedule
 $editing_schedule = isset($_GET['edit_schedule']) ? getScheduleEntry($_GET['edit_schedule']) : null;
 ?>
 <!DOCTYPE html>
@@ -72,442 +81,7 @@ $editing_schedule = isset($_GET['edit_schedule']) ? getScheduleEntry($_GET['edit
     <title>Teacher Schedule Management</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        /* Previous styles remain the same */
-        
-        /* Add these new styles for calendar */
-        :root {
-            --primary-color: #4361ee;
-            --secondary-color: #3f37c9;
-            --accent-color: #4895ef;
-            --light-color: #f8f9fa;
-            --dark-color: #212529;
-            --success-color: #4bb543;
-            --danger-color: #ff3333;
-            --warning-color: #ffc107;
-            --info-color: #17a2b8;
-        }
-        
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-        
-        body {
-            font-family: 'Roboto', sans-serif;
-            line-height: 1.6;
-            color: var(--dark-color);
-            background-color: #f5f7fa;
-            padding: 0;
-            margin: 0;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        header {
-            background-color: var(--primary-color);
-            color: white;
-            padding: 20px 0;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        
-        .header-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        h1 {
-            font-size: 28px;
-            font-weight: 500;
-            margin: 0;
-        }
-        
-        .tabs {
-            display: flex;
-            background-color: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-        }
-        
-        .tab {
-            padding: 15px 25px;
-            cursor: pointer;
-            text-align: center;
-            flex: 1;
-            transition: all 0.3s ease;
-            border-bottom: 3px solid transparent;
-        }
-        
-        .tab:hover {
-            background-color: rgba(67, 97, 238, 0.1);
-        }
-        
-        .tab.active {
-            background-color: rgba(67, 97, 238, 0.1);
-            border-bottom: 3px solid var(--primary-color);
-            color: var(--primary-color);
-            font-weight: 500;
-        }
-        
-        .tab i {
-            margin-right: 8px;
-        }
-        
-        .tab-content {
-            display: none;
-            background-color: white;
-            border-radius: 8px;
-            padding: 25px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-        }
-        
-        .tab-content.active {
-            display: block;
-            animation: fadeIn 0.5s ease;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        h2 {
-            color: var(--primary-color);
-            margin-bottom: 20px;
-            font-weight: 500;
-            font-size: 24px;
-        }
-        
-        h3 {
-            color: var(--secondary-color);
-            margin: 20px 0 15px;
-            font-weight: 500;
-            font-size: 20px;
-        }
-        
-        .section {
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .section:last-child {
-            border-bottom: none;
-        }
-        
-        .form-group {
-            margin-bottom: 15px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 500;
-            color: #555;
-        }
-        
-        input[type="text"],
-        input[type="number"],
-        input[type="date"],
-        input[type="email"],
-        input[type="password"],
-        select,
-        textarea {
-            width: 100%;
-            padding: 10px 15px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 16px;
-            transition: border 0.3s ease;
-        }
-        
-        input:focus,
-        select:focus,
-        textarea:focus {
-            border-color: var(--accent-color);
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(72, 149, 239, 0.2);
-        }
-        
-        button,
-        .btn {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: all 0.3s ease;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        button:hover,
-        .btn:hover {
-            background-color: var(--secondary-color);
-            transform: translateY(-2px);
-        }
-        
-        button i,
-        .btn i {
-            margin-right: 8px;
-        }
-        
-        .btn-danger {
-            background-color: var(--danger-color);
-        }
-        
-        .btn-danger:hover {
-            background-color: #e60000;
-        }
-        
-        .btn-success {
-            background-color: var(--success-color);
-        }
-        
-        .btn-success:hover {
-            background-color: #3aa33a;
-        }
-        
-        .btn-sm {
-            padding: 5px 10px;
-            font-size: 14px;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        
-        th, td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-        }
-        
-        th {
-            background-color: var(--primary-color);
-            color: white;
-            font-weight: 500;
-        }
-        
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        
-        tr:hover {
-            background-color: #f1f1f1;
-        }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-        
-        .status-working {
-            background-color: #e6f7e6;
-            color: var(--success-color);
-        }
-        
-        .status-leave {
-            background-color: #ffebee;
-            color: var(--danger-color);
-        }
-        
-        .alert {
-            padding: 15px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-        }
-        
-        .alert-success {
-            background-color: #e6f7e6;
-            color: var(--success-color);
-            border-left: 4px solid var(--success-color);
-        }
-        
-        .alert-danger {
-            background-color: #ffebee;
-            color: var(--danger-color);
-            border-left: 4px solid var(--danger-color);
-        }
-        
-        .alert i {
-            margin-right: 10px;
-            font-size: 20px;
-        }
-        
-        .card {
-            background-color: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-        
-        .card-title {
-            font-size: 18px;
-            font-weight: 500;
-            margin-bottom: 15px;
-            color: var(--primary-color);
-        }
-        
-        .stats-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .stat-card {
-            background-color: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        
-        .stat-value {
-            font-size: 32px;
-            font-weight: 700;
-            color: var(--primary-color);
-            margin: 10px 0;
-        }
-        
-        .stat-label {
-            color: #666;
-            font-size: 14px;
-        }
-        
-        .form-row {
-            display: flex;
-            flex-wrap: wrap;
-            margin: 0 -10px;
-        }
-        
-        .form-col {
-            flex: 1;
-            min-width: 250px;
-            padding: 0 10px;
-        }
-        
-        @media (max-width: 768px) {
-            .tabs {
-                flex-direction: column;
-            }
-            
-            .tab {
-                padding: 12px;
-                border-bottom: 1px solid #eee;
-            }
-            
-            .tab.active {
-                border-bottom: 3px solid var(--primary-color);
-                border-left: none;
-            }
-            
-            .form-col {
-                flex: 100%;
-            }
-
-        }
-        .calendar {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        
-        .calendar-header {
-            background-color: var(--primary-color);
-            color: white;
-            padding: 10px;
-            text-align: center;
-            font-weight: 500;
-            border-radius: 4px;
-        }
-        
-        .calendar-day {
-            background-color: white;
-            border: 1px solid #eee;
-            border-radius: 4px;
-            padding: 10px;
-            min-height: 100px;
-        }
-        
-        .calendar-date {
-            font-weight: bold;
-            margin-bottom: 5px;
-            color: var(--primary-color);
-        }
-        
-        .calendar-entry {
-            background-color: #f0f7ff;
-            border-left: 3px solid var(--accent-color);
-            padding: 5px;
-            margin-bottom: 5px;
-            font-size: 12px;
-            border-radius: 3px;
-        }
-        
-        .calendar-entry.leave {
-            background-color: #ffebee;
-            border-left-color: var(--danger-color);
-        }
-        
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-        }
-        
-        .modal-content {
-            background-color: white;
-            margin: 10% auto;
-            padding: 20px;
-            border-radius: 8px;
-            width: 80%;
-            max-width: 600px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            animation: modalFadeIn 0.3s;
-        }
-        
-        @keyframes modalFadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .close-modal {
-            float: right;
-            font-size: 24px;
-            cursor: pointer;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header>
@@ -524,19 +98,19 @@ $editing_schedule = isset($_GET['edit_schedule']) ? getScheduleEntry($_GET['edit
         <?php endif; ?>
         
         <div class="tabs">
-            <div class="tab active" onclick="openTab('teachers')">
+            <div class="tab <?= $active_tab === 'teachers' ? 'active' : '' ?>" data-tab="teachers">
                 <i class="fas fa-users"></i> Teachers
             </div>
-            <div class="tab" onclick="openTab('schedule')">
+            <div class="tab <?= $active_tab === 'schedule' ? 'active' : '' ?>" data-tab="schedule">
                 <i class="fas fa-calendar-alt"></i> Schedule
             </div>
-            <div class="tab" onclick="openTab('summary')">
+            <div class="tab <?= $active_tab === 'summary' ? 'active' : '' ?>" data-tab="summary">
                 <i class="fas fa-chart-pie"></i> Reports
             </div>
         </div>
         
         <!-- Teachers Tab -->
-        <div id="teachers" class="tab-content active">
+        <div id="teachers" class="tab-content <?= $active_tab === 'teachers' ? 'active' : '' ?>">
             <h2><i class="fas fa-users"></i> Teacher Management</h2>
             
             <div class="card">
@@ -633,7 +207,7 @@ $editing_schedule = isset($_GET['edit_schedule']) ? getScheduleEntry($_GET['edit
         </div>
         
         <!-- Schedule Tab -->
-        <div id="schedule" class="tab-content">
+        <div id="schedule" class="tab-content <?= $active_tab === 'schedule' ? 'active' : '' ?>">
             <h2><i class="fas fa-calendar-alt"></i> Schedule Management</h2>
             
             <div class="card">
@@ -788,8 +362,8 @@ $editing_schedule = isset($_GET['edit_schedule']) ? getScheduleEntry($_GET['edit
                     </div>
                 </div>
                 
-                <!-- Table View -->
-                <div style="overflow-x: auto;">
+ <!-- Table View with Pagination -->
+ <div style="overflow-x: auto;">
                     <table>
                         <thead>
                             <tr>
@@ -804,7 +378,7 @@ $editing_schedule = isset($_GET['edit_schedule']) ? getScheduleEntry($_GET['edit
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($schedules as $entry): ?>
+                            <?php foreach ($paginated_schedules as $entry): ?>
                             <tr>
                                 <td><?= $entry['week_number'] ?></td>
                                 <td><?= date('M j, Y', strtotime($entry['day_date'])) ?></td>
@@ -832,13 +406,27 @@ $editing_schedule = isset($_GET['edit_schedule']) ? getScheduleEntry($_GET['edit
                             <?php endforeach; ?>
                         </tbody>
                     </table>
-                </div>
+                    
+                    <!-- Pagination Controls -->
+        <div class="pagination">
+                <?php if ($current_page > 1): ?>
+                    <a href="?page=<?= $current_page - 1 ?>&active_tab=schedule&month=<?= $current_month ?>&year=<?= $current_year ?>" class="btn btn-sm">
+                        <i class="fas fa-arrow-left"></i> Previous
+                    </a>
+                <?php endif; ?>
+                
+                <span>Page <?= $current_page ?> of <?= $total_pages ?></span>
+                
+                <?php if ($current_page < $total_pages): ?>
+                    <a href="?page=<?= $current_page + 1 ?>&active_tab=schedule&month=<?= $current_month ?>&year=<?= $current_year ?>" class="btn btn-sm">
+                        Next <i class="fas fa-arrow-right"></i>
+                    </a>
+                <?php endif; ?>
             </div>
         </div>
         
-        <!-- Summary Tab (remains the same) -->
         <!-- Summary Tab -->
-        <div id="summary" class="tab-content">
+        <div id="summary" class="tab-content <?= $active_tab === 'summary' ? 'active' : '' ?>">
             <h2><i class="fas fa-chart-pie"></i> Monthly Reports</h2>
             
             <div class="stats-container">
@@ -880,17 +468,25 @@ $editing_schedule = isset($_GET['edit_schedule']) ? getScheduleEntry($_GET['edit
                             <tr>
                                 <th>Teacher</th>
                                 <th>Hourly Rate</th>
-                                <th>Total Hours</th>
+                                <th>Working Hours</th>
+                                <th>Substitute Hours</th>
+                                <th>Working Payment</th>
+                                <th>Substitute Payment</th>
                                 <th>Total Payment</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($summary as $teacher): ?>
+                            <?php foreach ($summary as $teacher): 
+                                $total_payment = $teacher['working_payment'] + $teacher['substitute_payment'];
+                            ?>
                             <tr>
                                 <td><?= htmlspecialchars($teacher['name']) ?></td>
                                 <td>$<?= number_format($teacher['hourly_rate'], 2) ?></td>
-                                <td><?= number_format($teacher['total_hours'], 2) ?>h</td>
-                                <td>$<?= number_format($teacher['total_payment'], 2) ?></td>
+                                <td><?= number_format($teacher['working_hours'], 2) ?>h</td>
+                                <td><?= number_format($teacher['substitute_hours'], 2) ?>h</td>
+                                <td>$<?= number_format($teacher['working_payment'], 2) ?></td>
+                                <td>$<?= number_format($teacher['substitute_payment'], 2) ?></td>
+                                <td>$<?= number_format($total_payment, 2) ?></td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -900,133 +496,182 @@ $editing_schedule = isset($_GET['edit_schedule']) ? getScheduleEntry($_GET['edit
             
             <div class="card">
                 <h3><i class="fas fa-user-graduate"></i> Individual Teacher Reports</h3>
-                <form method="get" id="teacher_report_form">
-                    <div class="form-row">
-                        <div class="form-col">
-                            <div class="form-group">
-                                <label for="report_teacher_id">Select Teacher</label>
-                                <select id="report_teacher_id" name="teacher_id" required>
-                                    <?php foreach ($teachers as $teacher): ?>
-                                        <option value="<?= $teacher['id'] ?>"><?= htmlspecialchars($teacher['name']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-col">
-                            <div class="form-group">
-                                <label for="report_month">Month</label>
-                                <select id="report_month" name="month">
-                                    <?php for ($i = 1; $i <= 12; $i++): ?>
-                                        <option value="<?= $i ?>" <?= $i == $current_month ? 'selected' : '' ?>>
-                                            <?= date('F', mktime(0, 0, 0, $i, 1)) ?>
-                                        </option>
-                                    <?php endfor; ?>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-col">
-                            <div class="form-group">
-                                <label for="report_year">Year</label>
-                                <input type="number" id="report_year" name="year" min="2000" max="2100" value="<?= $current_year ?>">
-                            </div>
+                <div class="form-row">
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label for="report_teacher_id">Select Teacher</label>
+                            <select id="report_teacher_id" name="teacher_id" required>
+                                <?php foreach ($teachers as $teacher): ?>
+                                    <option value="<?= $teacher['id'] ?>"><?= htmlspecialchars($teacher['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                     </div>
-                    
-                    <button type="button" onclick="generateTeacherReport()" class="btn">
-                        <i class="fas fa-file-pdf"></i> Generate Report
-                    </button>
-                </form>
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label for="report_month">Month</label>
+                            <select id="report_month" name="month" class="form-control">
+                                <?php for ($i = 1; $i <= 12; $i++): ?>
+                                    <option value="<?= $i ?>" <?= $i == $current_month ? 'selected' : '' ?>>
+                                        <?= date('F', mktime(0, 0, 0, $i, 1)) ?>
+                                    </option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label for="report_year">Year</label>
+                            <input type="number" id="report_year" name="year" min="2000" max="2100" 
+                                value="<?= $current_year ?>" class="form-control">
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="button" onclick="generateTeacherReport()" class="btn btn-primary">
+                    <i class="fas fa-file-alt"></i> Generate Report
+                </button>
                 
                 <div id="teacher_report_result" style="margin-top: 20px;"></div>
             </div>
         </div>
-    </main>
-    
-    <!-- Schedule Entry Modal -->
-    <div id="scheduleModal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal" onclick="closeModal()">&times;</span>
-            <div id="modalContent"></div>
+        </main>
+        
+        <!-- Schedule Entry Modal -->
+        <div id="scheduleModal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal" onclick="closeModal()">&times;</span>
+                <div id="modalContent"></div>
+            </div>
         </div>
-    </div>
-    
+
     <script>
-        // Tab functionality
-        function openTab(tabName) {
-            const tabs = document.getElementsByClassName('tab');
-            for (let i = 0; i < tabs.length; i++) {
-                tabs[i].classList.remove('active');
-            }
+       // Tab switching function
+       function switchTab(tabName) {
+            // Update URL
+            const url = new URL(window.location);
+            url.searchParams.set('active_tab', tabName);
+            window.history.pushState({}, '', url);
             
-            const tabContents = document.getElementsByClassName('tab-content');
-            for (let i = 0; i < tabContents.length; i++) {
-                tabContents[i].classList.remove('active');
-            }
+            // Update UI
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
             
-            document.querySelector(`.tab[onclick="openTab('${tabName}')"]`).classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            document.querySelector(`.tab[data-tab="${tabName}"]`).classList.add('active');
             document.getElementById(tabName).classList.add('active');
             
-            // Store the active tab in localStorage
+            // Store active tab
             localStorage.setItem('activeTab', tabName);
         }
-        
-        // Show/hide substitute field based on leave checkbox
-        document.getElementById('is_leave').addEventListener('change', function() {
-            document.getElementById('substitute_group').style.display = this.checked ? 'block' : 'none';
+
+        // Set up tab click handlers
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                const tabName = this.getAttribute('data-tab');
+                switchTab(tabName);
+            });
         });
-        
-        // Generate teacher report via AJAX
-        function generateTeacherReport() {
-            const form = document.getElementById('teacher_report_form');
-            const formData = new FormData(form);
-            const resultDiv = document.getElementById('teacher_report_result');
-            
-            resultDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Generating report...</div>';
-            
-            fetch('teacher_report.php?' + new URLSearchParams(formData))
-                .then(response => response.text())
-                .then(data => {
-                    resultDiv.innerHTML = data;
+
+        // Modal functions
+        function openScheduleModal(id) {
+            fetch(`get_schedule_entry.php?id=${id}`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Network error');
+                    return response.text();
+                })
+                .then(html => {
+                    document.getElementById('modalContent').innerHTML = html;
+                    document.getElementById('scheduleModal').style.display = 'block';
                 })
                 .catch(error => {
-                    resultDiv.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Error generating report: ${error}</div>`;
-                });
-        }
-        
-        // Modal functions
-        function openScheduleModal(scheduleId) {
-            fetch(`get_schedule_entry.php?id=${scheduleId}`)
-                .then(response => response.text())
-                .then(data => {
-                    document.getElementById('modalContent').innerHTML = data;
+                    console.error('Error:', error);
+                    document.getElementById('modalContent').innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-circle"></i> Error loading schedule details
+                        </div>
+                    `;
                     document.getElementById('scheduleModal').style.display = 'block';
                 });
         }
-        
+
         function closeModal() {
             document.getElementById('scheduleModal').style.display = 'none';
         }
-        
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('scheduleModal');
-            if (event.target == modal) {
-                closeModal();
-            }
+
+        // Teacher report generation
+        function generateTeacherReport() {
+            const teacherId = document.getElementById('report_teacher_id').value;
+            const month = document.getElementById('report_month').value;
+            const year = document.getElementById('report_year').value;
+            const resultDiv = document.getElementById('teacher_report_result');
+            
+            // Show loading indicator
+            resultDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="fas fa-spinner fa-spin"></i> Generating report...
+                </div>
+            `;
+            
+            // Create form data
+            const formData = new FormData();
+            formData.append('teacher_id', teacherId);
+            formData.append('month', month);
+            formData.append('year', year);
+            
+            fetch('teacher_report.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.text();
+            })
+            .then(html => {
+                resultDiv.innerHTML = html;
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle"></i> 
+                        Error generating report: ${error.message}
+                    </div>
+                `;
+                console.error('Error:', error);
+            });
         }
-        
-        // Check for active tab in localStorage on page load
+
+        // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
-            const activeTab = localStorage.getItem('activeTab') || 'teachers';
-            openTab(activeTab);
+            // Set active tab from URL or localStorage
+            const urlParams = new URLSearchParams(window.location.search);
+            const activeTab = urlParams.get('active_tab') || localStorage.getItem('activeTab') || 'summary';
+            switchTab(activeTab);
             
-            // Set default date to today
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('day_date').value = today;
-            document.getElementById('start_date').value = today;
+            // Set up leave checkbox behavior
+            const leaveCheckbox = document.getElementById('is_leave');
+            if (leaveCheckbox) {
+                leaveCheckbox.addEventListener('change', function() {
+                    document.getElementById('substitute_group').style.display = 
+                        this.checked ? 'block' : 'none';
+                });
+                
+                // Initialize state
+                document.getElementById('substitute_group').style.display = 
+                    leaveCheckbox.checked ? 'block' : 'none';
+            }
             
-            // Set week number to 1 by default
-            document.getElementById('week_number').value = 1;
+            // Close modal when clicking outside
+            window.addEventListener('click', function(event) {
+                const modal = document.getElementById('scheduleModal');
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
         });
     </script>
 </body>

@@ -61,27 +61,30 @@ function deleteScheduleEntry($id) {
     return $stmt->execute([$id]);
 }
 
-function getTeacherSchedule($teacher_id, $month = null, $year = null) {
+function getTeacherSchedule($teacher_id, $month, $year) {
     $db = getDB();
-    $params = [$teacher_id];
-    $sql = "SELECT s.*, t.name as teacher_name, st.name as substitute_name 
-            FROM schedule s 
-            LEFT JOIN teachers t ON s.teacher_id = t.id 
-            LEFT JOIN teachers st ON s.substitute_id = st.id 
-            WHERE s.teacher_id=?";
     
-    if ($month && $year) {
-        $sql .= " AND MONTH(day_date) = ? AND YEAR(day_date) = ?";
-        $params[] = $month;
-        $params[] = $year;
-    }
+    $startDate = "$year-$month-01";
+    $endDate = date('Y-m-t', strtotime($startDate));
     
-    $sql .= " ORDER BY day_date";
+    $query = "SELECT s.*, 
+                     t2.name as substitute_name 
+              FROM schedule s
+              LEFT JOIN teachers t2 ON s.substitute_id = t2.id
+              WHERE s.teacher_id = :teacher_id 
+              AND s.day_date BETWEEN :start_date AND :end_date
+              ORDER BY s.day_date ASC";
+              
+    $stmt = $db->prepare($query);
+    $stmt->execute([
+        ':teacher_id' => $teacher_id,
+        ':start_date' => $startDate,
+        ':end_date' => $endDate
+    ]);
     
-    $stmt = $db->prepare($sql);
-    $stmt->execute($params);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
+
 
 function getAllSchedules($month = null, $year = null) {
     $db = getDB();
@@ -106,31 +109,77 @@ function getAllSchedules($month = null, $year = null) {
 
 function getTeacherMonthlySummary($teacher_id, $month, $year) {
     $db = getDB();
-    $stmt = $db->prepare("SELECT 
-                            SUM(hours) as total_hours, 
-                            SUM(hours * (IFNULL(substitute_id, teacher_id) = teacher_id) * hourly_rate) as total_payment
-                          FROM schedule s
-                          JOIN teachers t ON s.teacher_id = t.id
-                          WHERE teacher_id=? AND MONTH(day_date)=? AND YEAR(day_date)=?");
-    $stmt->execute([$teacher_id, $month, $year]);
-    return $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // Get the teacher details first
+    $teacherQuery = "SELECT * FROM teachers WHERE id = :id LIMIT 1";
+    $teacherStmt = $db->prepare($teacherQuery);
+    $teacherStmt->execute([':id' => $teacher_id]);
+    $teacher = $teacherStmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$teacher) {
+        return null;
+    }
+    
+    // Calculate working hours (when not on leave)
+    $workingHoursQuery = "SELECT COALESCE(SUM(hours), 0) as working_hours 
+                          FROM schedule 
+                          WHERE teacher_id = :teacher_id 
+                          AND day_date BETWEEN :start_date AND :end_date
+                          AND is_leave = 0";
+                          
+    $workingStmt = $db->prepare($workingHoursQuery);
+    $workingStmt->execute([
+        ':teacher_id' => $teacher_id,
+        ':start_date' => "$year-$month-01",
+        ':end_date' => date('Y-m-t', strtotime("$year-$month-01"))
+    ]);
+    
+    $workingHours = $workingStmt->fetch(PDO::FETCH_ASSOC)['working_hours'] ?: 0;
+    
+    // Calculate substitute hours
+    $substituteHoursQuery = "SELECT COALESCE(SUM(hours), 0) as substitute_hours 
+                             FROM schedule 
+                             WHERE substitute_id = :teacher_id 
+                             AND day_date BETWEEN :start_date AND :end_date";
+                          
+    $substituteStmt = $db->prepare($substituteHoursQuery);
+    $substituteStmt->execute([
+        ':teacher_id' => $teacher_id,
+        ':start_date' => "$year-$month-01",
+        ':end_date' => date('Y-m-t', strtotime("$year-$month-01"))
+    ]);
+    
+    $substituteHours = $substituteStmt->fetch(PDO::FETCH_ASSOC)['substitute_hours'] ?: 0;
+    
+    // Calculate payments
+    $workingPayment = $workingHours * $teacher['hourly_rate'];
+    $substitutePayment = $substituteHours * $teacher['hourly_rate'];
+    
+    return [
+        'working_hours' => $workingHours,
+        'substitute_hours' => $substituteHours,
+        'working_payment' => $workingPayment,
+        'substitute_payment' => $substitutePayment,
+        'total_hours' => $workingHours + $substituteHours,
+        'total_payment' => $workingPayment + $substitutePayment
+    ];
 }
+
 
 function getAllTeachersMonthlySummary($month, $year) {
     $db = getDB();
-    $stmt = $db->prepare("SELECT 
-                            t.id, 
-                            t.name, 
-                            t.hourly_rate,
-                            SUM(s.hours) as total_hours, 
-                            SUM(s.hours * t.hourly_rate) as total_payment
-                          FROM schedule s
-                          JOIN teachers t ON s.teacher_id = t.id
-                          WHERE MONTH(day_date)=? AND YEAR(day_date)=?
-                          GROUP BY t.id, t.name, t.hourly_rate
-                          ORDER BY t.name");
-    $stmt->execute([$month, $year]);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    $teachers = getAllTeachers();
+    $summary = [];
+    
+    foreach ($teachers as $teacher) {
+        $teacherSummary = getTeacherMonthlySummary($teacher['id'], $month, $year);
+        if ($teacherSummary) {
+            $summary[] = array_merge($teacher, $teacherSummary);
+        }
+    }
+    
+    return $summary;
 }
 
 function getScheduleEntry($id) {
@@ -143,5 +192,6 @@ function getScheduleEntry($id) {
     $stmt->execute([$id]);
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
+
 
 ?>
