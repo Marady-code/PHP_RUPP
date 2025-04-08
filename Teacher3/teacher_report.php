@@ -49,14 +49,32 @@ if ($teacher_id) {
         
         echo "<div class='stats-container' style='margin-top: 20px;'>";
         echo "<div class='stat-card'>
-                <div class='stat-label'>Total Hours</div>
-                <div class='stat-value'>" . number_format($summary['total_hours'], 2) . "</div>
+                <div class='stat-label'>Regular Hours</div>
+                <div class='stat-value'>" . number_format($summary['working_hours'], 2) . "</div>
                 <div class='stat-label'>hours</div>
               </div>";
         
         echo "<div class='stat-card'>
+                <div class='stat-label'>Regular Payment</div>
+                <div class='stat-value'>$" . number_format($summary['teacher_payment'], 2) . "</div>
+                <div class='stat-label'>@ $" . $teacher['hourly_rate'] . "/hour</div>
+              </div>";
+        
+        echo "<div class='stat-card'>
+                <div class='stat-label'>Substitute Hours</div>
+                <div class='stat-value'>" . number_format($summary['substitute_hours'], 2) . "</div>
+                <div class='stat-label'>hours</div>
+              </div>";
+        
+        echo "<div class='stat-card'>
+                <div class='stat-label'>Substitute Payment</div>
+                <div class='stat-value'>$" . number_format($summary['substitute_payment'], 2) . "</div>
+                <div class='stat-label'>@ $" . $teacher['hourly_rate'] . "/hour</div>
+              </div>";
+        
+        echo "<div class='stat-card'>
                 <div class='stat-label'>Total Payment</div>
-                <div class='stat-value'>$" . number_format($summary['total_payment'], 2) . "</div>
+                <div class='stat-value'>$" . number_format(($summary['teacher_payment'] + $summary['substitute_payment']), 2) . "</div>
                 <div class='stat-label'>this month</div>
               </div>";
         echo "</div>";

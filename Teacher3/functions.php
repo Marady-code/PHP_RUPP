@@ -17,9 +17,10 @@ function updateTeacher($id, $name, $start_date, $phone, $hourly_rate) {
 
 function deleteTeacher($id) {
     $db = getDB();
-    $stmt = $db->prepare("DELETE FROM teachers WHERE id=?");
+    $stmt = $db->prepare("UPDATE teachers SET isActive = FALSE WHERE id=?");
     return $stmt->execute([$id]);
 }
+
 
 function getTeacher($id) {
     $db = getDB();
@@ -30,9 +31,10 @@ function getTeacher($id) {
 
 function getAllTeachers() {
     $db = getDB();
-    $stmt = $db->query("SELECT * FROM teachers ORDER BY name");
+    $stmt = $db->query("SELECT * FROM teachers WHERE isActive = TRUE ORDER BY name");
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
+
 
 // Schedule functions
 function addScheduleEntry($teacher_id, $week_number, $day_date, $hours, $is_leave = false, $substitute_id = null) {
@@ -57,7 +59,7 @@ function updateScheduleEntry($id, $teacher_id, $week_number, $day_date, $hours, 
 
 function deleteScheduleEntry($id) {
     $db = getDB();
-    $stmt = $db->prepare("DELETE FROM schedule WHERE id=?");
+    $stmt = $db->prepare("UPDATE schedule SET isActive = FALSE WHERE id=?");
     return $stmt->execute([$id]);
 }
 
@@ -88,11 +90,12 @@ function getAllSchedules($month = null, $year = null) {
     $sql = "SELECT s.*, t.name as teacher_name, t.hourly_rate, st.name as substitute_name 
             FROM schedule s 
             JOIN teachers t ON s.teacher_id = t.id 
-            LEFT JOIN teachers st ON s.substitute_id = st.id";
+            LEFT JOIN teachers st ON s.substitute_id = st.id
+            WHERE s.isActive = TRUE";
     
     $params = [];
     if ($month && $year) {
-        $sql .= " WHERE MONTH(day_date) = ? AND YEAR(day_date) = ?";
+        $sql .= " AND MONTH(day_date) = ? AND YEAR(day_date) = ?";
         $params[] = $month;
         $params[] = $year;
     }
@@ -107,12 +110,33 @@ function getAllSchedules($month = null, $year = null) {
 function getTeacherMonthlySummary($teacher_id, $month, $year) {
     $db = getDB();
     $stmt = $db->prepare("SELECT 
-                            SUM(hours) as total_hours, 
-                            SUM(hours * (IFNULL(substitute_id, teacher_id) = teacher_id) * hourly_rate) as total_payment
+                            SUM(hours) as total_hours,
+                            SUM(CASE 
+                                WHEN is_leave = 1 AND substitute_id IS NOT NULL THEN 0 
+                                ELSE hours 
+                            END) as working_hours,
+                            SUM(CASE 
+                                WHEN is_leave = 1 AND substitute_id IS NOT NULL THEN 0 
+                                ELSE hours * hourly_rate 
+                            END) as teacher_payment,
+                            SUM(CASE 
+                                WHEN substitute_id = :teacher_id THEN hours 
+                                ELSE 0 
+                            END) as substitute_hours,
+                            SUM(CASE 
+                                WHEN substitute_id = :teacher_id THEN hours * (SELECT hourly_rate FROM teachers WHERE id = :teacher_id)
+                                ELSE 0 
+                            END) as substitute_payment
                           FROM schedule s
                           JOIN teachers t ON s.teacher_id = t.id
-                          WHERE teacher_id=? AND MONTH(day_date)=? AND YEAR(day_date)=?");
-    $stmt->execute([$teacher_id, $month, $year]);
+                          WHERE (teacher_id = :teacher_id OR substitute_id = :teacher_id) 
+                          AND MONTH(day_date) = :month 
+                          AND YEAR(day_date) = :year");
+    $stmt->execute([
+        ':teacher_id' => $teacher_id,
+        ':month' => $month,
+        ':year' => $year
+    ]);
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
@@ -122,11 +146,42 @@ function getAllTeachersMonthlySummary($month, $year) {
                             t.id, 
                             t.name, 
                             t.hourly_rate,
-                            SUM(s.hours) as total_hours, 
-                            SUM(s.hours * t.hourly_rate) as total_payment
+                            SUM(CASE 
+                                WHEN s.teacher_id = t.id AND (s.is_leave = 0 OR (s.is_leave = 1 AND s.substitute_id IS NULL)) THEN s.hours 
+                                ELSE 0 
+                            END) as working_hours,
+                            SUM(CASE 
+                                WHEN s.teacher_id = t.id AND (s.is_leave = 0 OR (s.is_leave = 1 AND s.substitute_id IS NULL)) THEN s.hours * t.hourly_rate 
+                                ELSE 0 
+                            END) as teacher_payment,
+                            SUM(CASE 
+                                WHEN s.substitute_id = t.id THEN s.hours 
+                                ELSE 0 
+                            END) as substitute_hours,
+                            SUM(CASE 
+                                WHEN s.substitute_id = t.id THEN s.hours * t.hourly_rate 
+                                ELSE 0 
+                            END) as substitute_payment,
+                            (SUM(CASE 
+                                WHEN s.teacher_id = t.id AND (s.is_leave = 0 OR (s.is_leave = 1 AND s.substitute_id IS NULL)) THEN s.hours * t.hourly_rate 
+                                ELSE 0 
+                            END) + 
+                            SUM(CASE 
+                                WHEN s.substitute_id = t.id THEN s.hours * t.hourly_rate 
+                                ELSE 0 
+                            END)) as total_payment,
+                            (SUM(CASE 
+                                WHEN s.teacher_id = t.id AND (s.is_leave = 0 OR (s.is_leave = 1 AND s.substitute_id IS NULL)) THEN s.hours 
+                                ELSE 0 
+                            END) + 
+                            SUM(CASE 
+                                WHEN s.substitute_id = t.id THEN s.hours 
+                                ELSE 0 
+                            END)) as total_hours
                           FROM schedule s
-                          JOIN teachers t ON s.teacher_id = t.id
-                          WHERE MONTH(day_date)=? AND YEAR(day_date)=?
+                          JOIN teachers t ON (s.teacher_id = t.id OR s.substitute_id = t.id)
+                          WHERE MONTH(day_date) = ? AND YEAR(day_date) = ?
+                          AND s.isActive = TRUE
                           GROUP BY t.id, t.name, t.hourly_rate
                           ORDER BY t.name");
     $stmt->execute([$month, $year]);
@@ -142,6 +197,18 @@ function getScheduleEntry($id) {
                          WHERE s.id=?");
     $stmt->execute([$id]);
     return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+function getInactiveTeachers() {
+    $db = getDB();
+    $stmt = $db->query("SELECT * FROM teachers WHERE isActive = FALSE ORDER BY name");
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function reactivateTeacher($id) {
+    $db = getDB();
+    $stmt = $db->prepare("UPDATE teachers SET isActive = TRUE WHERE id=?");
+    return $stmt->execute([$id]);
 }
 
 ?>

@@ -57,6 +57,8 @@ $current_year = date('Y');
 $teachers = getAllTeachers();
 $schedules = getAllSchedules($current_month, $current_year);
 $summary = getAllTeachersMonthlySummary($current_month, $current_year);
+$total_hours = array_sum(array_column($summary, 'total_hours'));
+$total_payment = array_sum(array_column($summary, 'total_payment'));
 
 // Check if we're editing a teacher
 $editing_teacher = isset($_GET['edit_teacher']) ? getTeacher($_GET['edit_teacher']) : null;
@@ -72,442 +74,7 @@ $editing_schedule = isset($_GET['edit_schedule']) ? getScheduleEntry($_GET['edit
     <title>Teacher Schedule Management</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        /* Previous styles remain the same */
-        
-        /* Add these new styles for calendar */
-        :root {
-            --primary-color: #4361ee;
-            --secondary-color: #3f37c9;
-            --accent-color: #4895ef;
-            --light-color: #f8f9fa;
-            --dark-color: #212529;
-            --success-color: #4bb543;
-            --danger-color: #ff3333;
-            --warning-color: #ffc107;
-            --info-color: #17a2b8;
-        }
-        
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-        
-        body {
-            font-family: 'Roboto', sans-serif;
-            line-height: 1.6;
-            color: var(--dark-color);
-            background-color: #f5f7fa;
-            padding: 0;
-            margin: 0;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        header {
-            background-color: var(--primary-color);
-            color: white;
-            padding: 20px 0;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        
-        .header-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        h1 {
-            font-size: 28px;
-            font-weight: 500;
-            margin: 0;
-        }
-        
-        .tabs {
-            display: flex;
-            background-color: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-        }
-        
-        .tab {
-            padding: 15px 25px;
-            cursor: pointer;
-            text-align: center;
-            flex: 1;
-            transition: all 0.3s ease;
-            border-bottom: 3px solid transparent;
-        }
-        
-        .tab:hover {
-            background-color: rgba(67, 97, 238, 0.1);
-        }
-        
-        .tab.active {
-            background-color: rgba(67, 97, 238, 0.1);
-            border-bottom: 3px solid var(--primary-color);
-            color: var(--primary-color);
-            font-weight: 500;
-        }
-        
-        .tab i {
-            margin-right: 8px;
-        }
-        
-        .tab-content {
-            display: none;
-            background-color: white;
-            border-radius: 8px;
-            padding: 25px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-        }
-        
-        .tab-content.active {
-            display: block;
-            animation: fadeIn 0.5s ease;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        h2 {
-            color: var(--primary-color);
-            margin-bottom: 20px;
-            font-weight: 500;
-            font-size: 24px;
-        }
-        
-        h3 {
-            color: var(--secondary-color);
-            margin: 20px 0 15px;
-            font-weight: 500;
-            font-size: 20px;
-        }
-        
-        .section {
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .section:last-child {
-            border-bottom: none;
-        }
-        
-        .form-group {
-            margin-bottom: 15px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 500;
-            color: #555;
-        }
-        
-        input[type="text"],
-        input[type="number"],
-        input[type="date"],
-        input[type="email"],
-        input[type="password"],
-        select,
-        textarea {
-            width: 100%;
-            padding: 10px 15px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 16px;
-            transition: border 0.3s ease;
-        }
-        
-        input:focus,
-        select:focus,
-        textarea:focus {
-            border-color: var(--accent-color);
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(72, 149, 239, 0.2);
-        }
-        
-        button,
-        .btn {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: all 0.3s ease;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        button:hover,
-        .btn:hover {
-            background-color: var(--secondary-color);
-            transform: translateY(-2px);
-        }
-        
-        button i,
-        .btn i {
-            margin-right: 8px;
-        }
-        
-        .btn-danger {
-            background-color: var(--danger-color);
-        }
-        
-        .btn-danger:hover {
-            background-color: #e60000;
-        }
-        
-        .btn-success {
-            background-color: var(--success-color);
-        }
-        
-        .btn-success:hover {
-            background-color: #3aa33a;
-        }
-        
-        .btn-sm {
-            padding: 5px 10px;
-            font-size: 14px;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        
-        th, td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-        }
-        
-        th {
-            background-color: var(--primary-color);
-            color: white;
-            font-weight: 500;
-        }
-        
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        
-        tr:hover {
-            background-color: #f1f1f1;
-        }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-        
-        .status-working {
-            background-color: #e6f7e6;
-            color: var(--success-color);
-        }
-        
-        .status-leave {
-            background-color: #ffebee;
-            color: var(--danger-color);
-        }
-        
-        .alert {
-            padding: 15px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-        }
-        
-        .alert-success {
-            background-color: #e6f7e6;
-            color: var(--success-color);
-            border-left: 4px solid var(--success-color);
-        }
-        
-        .alert-danger {
-            background-color: #ffebee;
-            color: var(--danger-color);
-            border-left: 4px solid var(--danger-color);
-        }
-        
-        .alert i {
-            margin-right: 10px;
-            font-size: 20px;
-        }
-        
-        .card {
-            background-color: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-        
-        .card-title {
-            font-size: 18px;
-            font-weight: 500;
-            margin-bottom: 15px;
-            color: var(--primary-color);
-        }
-        
-        .stats-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .stat-card {
-            background-color: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        
-        .stat-value {
-            font-size: 32px;
-            font-weight: 700;
-            color: var(--primary-color);
-            margin: 10px 0;
-        }
-        
-        .stat-label {
-            color: #666;
-            font-size: 14px;
-        }
-        
-        .form-row {
-            display: flex;
-            flex-wrap: wrap;
-            margin: 0 -10px;
-        }
-        
-        .form-col {
-            flex: 1;
-            min-width: 250px;
-            padding: 0 10px;
-        }
-        
-        @media (max-width: 768px) {
-            .tabs {
-                flex-direction: column;
-            }
-            
-            .tab {
-                padding: 12px;
-                border-bottom: 1px solid #eee;
-            }
-            
-            .tab.active {
-                border-bottom: 3px solid var(--primary-color);
-                border-left: none;
-            }
-            
-            .form-col {
-                flex: 100%;
-            }
-
-        }
-        .calendar {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        
-        .calendar-header {
-            background-color: var(--primary-color);
-            color: white;
-            padding: 10px;
-            text-align: center;
-            font-weight: 500;
-            border-radius: 4px;
-        }
-        
-        .calendar-day {
-            background-color: white;
-            border: 1px solid #eee;
-            border-radius: 4px;
-            padding: 10px;
-            min-height: 100px;
-        }
-        
-        .calendar-date {
-            font-weight: bold;
-            margin-bottom: 5px;
-            color: var(--primary-color);
-        }
-        
-        .calendar-entry {
-            background-color: #f0f7ff;
-            border-left: 3px solid var(--accent-color);
-            padding: 5px;
-            margin-bottom: 5px;
-            font-size: 12px;
-            border-radius: 3px;
-        }
-        
-        .calendar-entry.leave {
-            background-color: #ffebee;
-            border-left-color: var(--danger-color);
-        }
-        
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-        }
-        
-        .modal-content {
-            background-color: white;
-            margin: 10% auto;
-            padding: 20px;
-            border-radius: 8px;
-            width: 80%;
-            max-width: 600px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            animation: modalFadeIn 0.3s;
-        }
-        
-        @keyframes modalFadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .close-modal {
-            float: right;
-            font-size: 24px;
-            cursor: pointer;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header>
@@ -619,7 +186,8 @@ $editing_schedule = isset($_GET['edit_schedule']) ? getScheduleEntry($_GET['edit
                                     </a>
                                     <form method="post" style="display:inline;">
                                         <input type="hidden" name="id" value="<?= $teacher['id'] ?>">
-                                        <button type="submit" name="delete_teacher" class="btn-danger btn-sm">
+                                        <button type="submit" name="delete_teacher" class="btn-danger btn-sm"
+                                        onclick="return confirmDeleteTeacher();">
                                             <i class="fas fa-trash-alt"></i> Delete
                                         </button>
                                     </form>
@@ -823,7 +391,7 @@ $editing_schedule = isset($_GET['edit_schedule']) ? getScheduleEntry($_GET['edit
                                     </a>
                                     <form method="post" style="display:inline;">
                                         <input type="hidden" name="id" value="<?= $entry['id'] ?>">
-                                        <button type="submit" name="delete_schedule" class="btn-danger btn-sm">
+                                        <button type="submit" name="delete_schedule" class="btn-danger btn-sm" onclick="return confirmDeleteSchedule();">
                                             <i class="fas fa-trash-alt"></i> Delete
                                         </button>
                                     </form>
@@ -861,13 +429,13 @@ $editing_schedule = isset($_GET['edit_schedule']) ? getScheduleEntry($_GET['edit
                 
                 <div class="stat-card">
                     <div class="stat-label">Total Hours</div>
-                    <div class="stat-value"><?= number_format($total_hours, 2) ?></div>
+                    <div class="stat-value"><?= number_format($total_hours ?? 0, 2) ?></div>
                     <div class="stat-label">hours</div>
                 </div>
-                
+
                 <div class="stat-card">
                     <div class="stat-label">Total Payment</div>
-                    <div class="stat-value">$<?= number_format($total_payment, 2) ?></div>
+                    <div class="stat-value">$<?= number_format($total_payment ?? 0, 2) ?></div>
                     <div class="stat-label">this month</div>
                 </div>
             </div>
@@ -880,6 +448,8 @@ $editing_schedule = isset($_GET['edit_schedule']) ? getScheduleEntry($_GET['edit
                             <tr>
                                 <th>Teacher</th>
                                 <th>Hourly Rate</th>
+                                <th>Regular Hours</th>
+                                <th>Substitute Hours</th>
                                 <th>Total Hours</th>
                                 <th>Total Payment</th>
                             </tr>
@@ -889,6 +459,8 @@ $editing_schedule = isset($_GET['edit_schedule']) ? getScheduleEntry($_GET['edit
                             <tr>
                                 <td><?= htmlspecialchars($teacher['name']) ?></td>
                                 <td>$<?= number_format($teacher['hourly_rate'], 2) ?></td>
+                                <td><?= number_format($teacher['working_hours'], 2) ?>h</td>
+                                <td><?= number_format($teacher['substitute_hours'], 2) ?>h</td>
                                 <td><?= number_format($teacher['total_hours'], 2) ?>h</td>
                                 <td>$<?= number_format($teacher['total_payment'], 2) ?></td>
                             </tr>
@@ -1028,6 +600,21 @@ $editing_schedule = isset($_GET['edit_schedule']) ? getScheduleEntry($_GET['edit
             // Set week number to 1 by default
             document.getElementById('week_number').value = 1;
         });
+
+        function confirmDeleteTeacher(form) {
+            if (confirm("Are you sure you want to delete this teacher? This will remove them from active lists but keep their records.")) {
+                form.submit();
+            }
+            return false;
+        }
+
+        function confirmDeleteSchedule(form) {
+            if (confirm("Are you sure you want to delete this schedule entry?")) {
+                form.submit();
+            }
+            return false;
+        }
+
     </script>
 </body>
 </html>
